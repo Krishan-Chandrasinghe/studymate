@@ -1,36 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import NoteForm from './components/NoteForm'
 import NoteCard from './components/NoteCard'
+import { fetchNotes, createNote, deleteNote } from './api/notes'
 import './App.css'
 
 const THEME_STORAGE_KEY = 'studymate-theme'
-
-const SEED_NOTES = [
-  {
-    id: 'seed-1',
-    title: 'Photosynthesis Recap',
-    subject: 'Biology',
-    content:
-      'Light-dependent reactions occur in the thylakoid membrane and produce ATP and NADPH, which feed the Calvin cycle in the stroma.',
-    createdAt: '2026-07-10T09:00:00.000Z',
-  },
-  {
-    id: 'seed-2',
-    title: 'Big-O Cheat Sheet',
-    subject: 'Computer Science',
-    content:
-      'Binary search is O(log n). Hash map lookups are O(1) average case. Always double-check worst-case behavior before assuming average case.',
-    createdAt: '2026-07-12T14:30:00.000Z',
-  },
-  {
-    id: 'seed-3',
-    title: 'French Revolution Timeline',
-    subject: 'History',
-    content:
-      'Storming of the Bastille (1789) → Reign of Terror (1793-94) → Rise of Napoleon (1799). Key turning point: execution of Louis XVI in 1793.',
-    createdAt: '2026-07-14T18:15:00.000Z',
-  },
-]
 
 function getPreferredTheme() {
   const stored = localStorage.getItem(THEME_STORAGE_KEY)
@@ -42,6 +16,7 @@ function getPreferredTheme() {
 function App() {
   const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [theme, setTheme] = useState(getPreferredTheme)
 
@@ -51,25 +26,24 @@ function App() {
   }, [theme])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setNotes(SEED_NOTES)
-      setLoading(false)
-    }, 600)
-
-    return () => clearTimeout(timer)
+    fetchNotes()
+      .then(setNotes)
+      .catch((err) => setLoadError(err.message))
+      .finally(() => setLoading(false))
   }, [])
 
-  const handleAddNote = (fields) => {
-    const newNote = {
-      ...fields,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    }
+  const handleAddNote = async (fields) => {
+    const newNote = await createNote(fields)
     setNotes((prev) => [newNote, ...prev])
   }
 
-  const handleDeleteNote = (id) => {
-    setNotes((prev) => prev.filter((note) => note.id !== id))
+  const handleDeleteNote = async (id) => {
+    await deleteNote(id)
+    setNotes((prev) => prev.filter((note) => note._id !== id))
+  }
+
+  const handleNoteUpdated = (updatedNote) => {
+    setNotes((prev) => prev.map((note) => (note._id === updatedNote._id ? updatedNote : note)))
   }
 
   const filteredNotes = useMemo(() => {
@@ -127,6 +101,10 @@ function App() {
               <span className="spinner" aria-hidden="true" />
               <p>Loading your notes...</p>
             </div>
+          ) : loadError ? (
+            <div className="state-message empty-state">
+              <p>Could not load notes: {loadError}. Is the server running?</p>
+            </div>
           ) : filteredNotes.length === 0 ? (
             <div className="state-message empty-state">
               <p>
@@ -138,7 +116,12 @@ function App() {
           ) : (
             <div className="notes-grid">
               {filteredNotes.map((note) => (
-                <NoteCard key={note.id} note={note} onDelete={handleDeleteNote} />
+                <NoteCard
+                  key={note._id}
+                  note={note}
+                  onDelete={handleDeleteNote}
+                  onNoteUpdated={handleNoteUpdated}
+                />
               ))}
             </div>
           )}

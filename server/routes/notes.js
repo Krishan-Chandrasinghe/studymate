@@ -1,6 +1,7 @@
 const express = require('express');
 const Note = require('../models/Note');
 const validateNote = require('../middleware/validateNote');
+const { generateSummaryAndQuiz } = require('../services/anthropicService');
 
 const router = express.Router();
 
@@ -49,6 +50,31 @@ router.put('/:id', validateNote, async (req, res) => {
       return res.status(400).json({ error: 'Invalid note id.' });
     }
     res.status(500).json({ error: 'Failed to update note.' });
+  }
+});
+
+// POST /api/notes/:id/summarize
+router.post('/:id/summarize', async (req, res) => {
+  try {
+    const note = await Note.findById(req.params.id);
+
+    if (!note) {
+      return res.status(404).json({ error: 'Note not found.' });
+    }
+
+    const { summary, quiz } = await generateSummaryAndQuiz(note.content);
+
+    note.summary = summary.join('\n');
+    note.quiz = quiz;
+    await note.save();
+
+    res.json(note);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid note id.' });
+    }
+    console.error('Summarize failed:', err.message);
+    res.status(502).json({ error: 'AI summarization failed. Please try again.' });
   }
 });
 

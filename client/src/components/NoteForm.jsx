@@ -5,13 +5,14 @@ const EMPTY_FIELDS = { title: '', subject: '', content: '' }
 function NoteForm({ onAddNote }) {
   const [fields, setFields] = useState(EMPTY_FIELDS)
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const handleChange = (event) => {
     const { name, value } = event.target
     setFields((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     const title = fields.title.trim()
@@ -23,9 +24,16 @@ function NoteForm({ onAddNote }) {
       return
     }
 
-    onAddNote({ title, subject, content })
-    setFields(EMPTY_FIELDS)
-    setError('')
+    setSubmitting(true)
+    try {
+      await onAddNote({ title, subject, content })
+      setFields(EMPTY_FIELDS)
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -70,8 +78,8 @@ function NoteForm({ onAddNote }) {
 
       {error && <p className="form-error">{error}</p>}
 
-      <button type="submit" className="btn btn-primary">
-        Add Note
+      <button type="submit" className="btn btn-primary" disabled={submitting}>
+        {submitting ? 'Adding…' : 'Add Note'}
       </button>
     </form>
   )
